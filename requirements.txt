@@ -1,0 +1,3 @@
+aiohttp==3.7.4
+requests==2.26.0
+telethon==1.23.0

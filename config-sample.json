@@ -1,0 +1,11 @@
+{
+    "api_id": "your_telegram_api_id",
+    "api_hash": "your_telegram_api_hash",
+    "target_config": {},
+    "openai": {
+        "enable": true,
+        "api_key": "your_openai_api_key",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "model": "gpt-3.5-turbo"
+    }
+}
