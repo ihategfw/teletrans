@@ -220,9 +220,7 @@ async def handle_message(event):
 
             modified_message += '\n%s' % '\n'.join(secondary_messages)
 
-        formatting_entities = [message.entities[i] for i in range(len(message.entities))] if message.entities else []
-        formatting_entities.append(MessageEntityBlockquote(offset=len(translated_texts[target_langs[0]])+1, length=len(modified_message)-len(translated_texts[target_langs[0]])-1))
-        await client.edit_message(message, modified_message, formatting_entities=formatting_entities)
+        await client.edit_message(message, modified_message, formatting_entities=[MessageEntityBlockquote(offset=len(translated_texts[target_langs[0]])+1, length=len(modified_message)-len(translated_texts[target_langs[0]])-1)])
 
     except Exception as e:
         # 记录处理消息时发生的异常。
