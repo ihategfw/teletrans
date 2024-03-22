@@ -218,11 +218,12 @@ async def handle_message(event):
             for lang in target_langs[1:]:
                 secondary_messages.append(translated_texts[lang])
 
-            modified_message += '\n%s\n' % '\n'.join(secondary_messages)
+            modified_message += '\n%s' % '\n'.join(secondary_messages)
 
         formatting_entities = [message.entities[i] for i in range(len(message.entities))] if message.entities else []
-        formatting_entities.append(MessageEntityBlockquote(offset=len(message_content)+1, length=len(modified_message)-len(message_content)-2))
-        tmp_message = await client.edit_message(message, modified_message, formatting_entities=formatting_entities)
+        formatting_entities.append(MessageEntityBlockquote(offset=len(translated_texts[target_langs[0]])+1, length=len(modified_message)-len(translated_texts[target_langs[0]])-1))
+        await client.edit_message(message, modified_message, formatting_entities=formatting_entities)
+
     except Exception as e:
         # 记录处理消息时发生的异常。
         logger.error(f"Error handling message: {e}")
