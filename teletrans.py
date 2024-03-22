@@ -11,16 +11,37 @@ import aiohttp
 import requests
 from telethon import events
 from telethon.sync import TelegramClient
+from telethon.tl.types import MessageEntityBlockquote
+from logging.handlers import RotatingFileHandler
 
-# 设置日志记录，便于调试和追踪程序运行情况。
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 workspace = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
+
+# 创建一个logger
+logger = logging.getLogger('my_logger')
+logger.setLevel(logging.INFO)
+
+# 创建一个handler，用于写入日志文件
+handler = RotatingFileHandler('%s/log.txt' % workspace, maxBytes=20000000, backupCount=5)
+
+# 定义handler的输出格式
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+
+# 给logger添加handler
+logger.addHandler(handler)
+
+# 创建一个handler，用于输出到控制台
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+
+# 给logger添加handler
+logger.addHandler(stream_handler)
 
 def load_config():
     # load config from json file, check if the file exists first
     if not os.path.exists('%s/config.json' % workspace):
-        logging.error('config.json not found, created an empty one')
+        logger.error('config.json not found, created an empty one')
         exit()
 
     with open('%s/config.json' % workspace, 'r') as f:
@@ -80,36 +101,34 @@ async def translate_single(text, source_lang, target_lang, session):
 
         start_time = time.time()
         async with session.post(url, headers=headers, data=json.dumps(payload)) as response:
-            logging.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
+            logger.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
             response_text = await response.text()
             result = json.loads(response_text)
-            if not result['choices'][0]['message']['content']:
-                logging.error(f"翻译失败：{result}")
-                raise Exception(f"翻译失败")
-            return target_lang, result['choices'][0]['message']['content']
+            try:
+                return target_lang, result['choices'][0]['message']['content']
+            except Exception as e:
+                logger.error(f"OpenAI 翻译失败：{response_text}")
+                
+    url = "https://api.deeplx.org/translate"
+    payload = {
+        "text": text,
+        "source_lang": source_lang,
+        "target_lang": target_lang
+    }
 
-    else:
-        url = "https://api.deeplx.org/translate"
-        payload = {
-            "text": text,
-            "source_lang": source_lang,
-            "target_lang": target_lang
-        }
+    start_time = time.time()
+    async with session.post(url, json=payload) as response:
+        logger.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
+        if response.status != 200:
+            logger.error(f"翻译失败：{response.status}")
+            raise Exception(f"翻译失败")
 
-        start_time = time.time()
-        async with session.post(url, json=payload) as response:
-            logging.info({response})
-            logging.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
-            if response.status != 200:
-                logging.error(f"翻译失败：{response.status}")
-                raise Exception(f"翻译失败")
+        result = await response.json()
+        if result['code'] != 200:
+            logger.error(f"翻译失败：{result}")
+            raise Exception(f"翻译失败")
 
-            result = await response.json()
-            if result['code'] != 200:
-                logging.error(f"翻译失败：{result}")
-                raise Exception(f"翻译失败")
-
-            return target_lang, result['data']
+        return target_lang, result['data']
 
 
 async def translate_text(text, source_lang, target_langs) -> {}:
@@ -129,7 +148,7 @@ async def command_mode(event, target_key, text) -> bool:
         if target_key in target_config:
             del target_config[target_key]
             save_config()
-            logging.info("已禁用: %s" % target_key)
+            logger.info("已禁用: %s" % target_key)
 
         return False
 
@@ -143,13 +162,13 @@ async def command_mode(event, target_key, text) -> bool:
         }
 
         save_config()
-        logging.info(f"设置成功: {target_config[target_key]}")
+        logger.info(f"设置成功: {target_config[target_key]}")
 
         return False
 
     if text.startswith('.tt-skip'):
         await event.message.edit(text[8:])
-        logging.info("跳过翻译")
+        logger.info("跳过翻译")
         return False
 
     return True
@@ -169,9 +188,11 @@ async def handle_message(event):
         if not message_content:
             return
 
-        # 因为reaction会触发编辑消息事件，为避免重复翻译，所以如果包含```，则不进行翻译。
-        if '```' in message_content:
-            return
+        # 判断event中是否包含entities，如果包含，则需要根据entities进行翻译。
+        if message.entities:
+            for entity in message.entities:
+                if isinstance(entity, MessageEntityBlockquote):
+                    return
 
         if message_content.startswith('.tt-') and not await command_mode(event, target_key, message_content):
             return
@@ -179,7 +200,7 @@ async def handle_message(event):
         if target_key not in target_config:
             return
 
-        logging.info(f"翻译消息: {message.text}")
+        logger.info(f"翻译消息: {message.text}")
 
         config = target_config[target_key]
         target_langs = config['target_langs']
@@ -188,7 +209,7 @@ async def handle_message(event):
 
         start_time = time.time()  # 记录开始时间
         translated_texts = await translate_text(message.text, config['source_lang'], target_langs)
-        logging.info(f"翻译耗时: {time.time() - start_time}")
+        logger.info(f"翻译耗时: {time.time() - start_time}")
 
         modified_message = translated_texts[target_langs[0]]
 
@@ -197,12 +218,14 @@ async def handle_message(event):
             for lang in target_langs[1:]:
                 secondary_messages.append(translated_texts[lang])
 
-            modified_message += '\n```%s\n```' % '\n'.join(secondary_messages)
+            modified_message += '\n%s\n' % '\n'.join(secondary_messages)
 
-        await message.edit(modified_message)
+        formatting_entities = [message.entities[i] for i in range(len(message.entities))] if message.entities else []
+        formatting_entities.append(MessageEntityBlockquote(offset=len(message_content)+1, length=len(modified_message)-len(message_content)-2))
+        tmp_message = await client.edit_message(message, modified_message, formatting_entities=formatting_entities)
     except Exception as e:
         # 记录处理消息时发生的异常。
-        logging.error(f"Error handling message: {e}")
+        logger.error(f"Error handling message: {e}")
 
 
 # 启动客户端并保持运行。
