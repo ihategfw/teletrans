@@ -9,6 +9,7 @@ import sys
 
 import aiohttp
 import requests
+import re
 from telethon import events
 from telethon.sync import TelegramClient
 from telethon.tl.types import MessageEntityBlockquote
@@ -180,6 +181,7 @@ async def handle_message(event):
     target_key = '%d.%d' % (event.chat_id, event.sender_id)
     try:
         message = event.message
+        logger.debug(f"{message}")
 
         if not message.text:
             return
@@ -220,7 +222,24 @@ async def handle_message(event):
 
             modified_message += '\n%s' % '\n'.join(secondary_messages)
 
-        await client.edit_message(message, modified_message, formatting_entities=[MessageEntityBlockquote(offset=len(translated_texts[target_langs[0]])+1, length=len(modified_message)-len(translated_texts[target_langs[0]])-1)])
+        # Handle special characters such as emojis and other unicode characters
+        pattern = u'[\U00010000-\U0010ffff]'
+        matches = len(re.findall(pattern, message_content))
+
+        # Extract repeated computations
+        translated_text = translated_texts[target_langs[0]]
+        pattern_matches_translated = len(re.findall(pattern, translated_text))
+        pattern_matches_modified = len(re.findall(pattern, modified_message))
+
+        # Calculate offsets and lengths
+        offset = len(translated_text) + pattern_matches_translated + 1
+        length = len(modified_message) - len(translated_text) + pattern_matches_modified - pattern_matches_translated - 1
+
+        # Create MessageEntityBlockquote with calculated values
+        formatting_entities = [MessageEntityBlockquote(offset=offset, length=length)]
+
+        # Edit the message
+        await client.edit_message(message, modified_message, formatting_entities=formatting_entities)
 
     except Exception as e:
         # 记录处理消息时发生的异常。
