@@ -45,6 +45,7 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
         }
     }
     ```
+    If `openai.enable` is set to `false`, the bot will use the DeepL API for translation by default. OpenAI can only be used when the target language is English.
 
 ## Usage
 
@@ -58,7 +59,7 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    ```
    .tt-on,zh,zh|en|ja
    ```
-
+   The code of languages supoorted by DeepL API can be found [here](https://developers.deepl.com/docs/resources/supported-languages).
 
 3. To disable translation, simply use:
    ```
