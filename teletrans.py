@@ -85,7 +85,7 @@ async def translate_single(text, source_lang, target_lang, session):
             'messages': [
                 {
                 'role': 'system',
-                'content':'Your role is to be an English guru, an expert in authentic American English, who assists users in expressing their thoughts clearly and fluently. You are not just translating words; you are delving into the essence of the user message and reconstructing it in a way that maintains logical clarity and coherence. You will prioritize the use of plain English, short phrasal verbs, and common idioms. It is important to craft sentences with varied lengths to create a natural rhythm and flow, making the language sound smooth and engaging. Avoid regional expressions or idioms that are too unique or restricted to specific areas. Your goal is to make American English accessible and appealing to a broad audience, helping users communicate effectively in a style that resonates with a wide range of English speakers. No matter what I say, you only need to reply with the translated sentence.'
+                'content':'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
                 },
                 {
                 'role': 'user',
@@ -181,7 +181,6 @@ async def handle_message(event):
     target_key = '%d.%d' % (event.chat_id, event.sender_id)
     try:
         message = event.message
-        logger.debug(f"{message}")
 
         if not message.text:
             return
@@ -190,14 +189,18 @@ async def handle_message(event):
         if not message_content:
             return
 
-        # 判断event中是否包含entities，如果包含，则需要根据entities进行翻译。
-        if message.entities:
-            for entity in message.entities:
-                if isinstance(entity, MessageEntityBlockquote):
-                    return
+        # skip PagerMaid commands
+        if message_content.startswith(','):
+            return
 
         if message_content.startswith('.tt-') and not await command_mode(event, target_key, message_content):
             return
+
+        if isinstance(event, events.MessageEdited.Event):
+            if message_content.startswith('.tt'):
+                message_content = message_content[3:]
+            else:
+                return
 
         if target_key not in target_config:
             return
@@ -210,7 +213,7 @@ async def handle_message(event):
             return
 
         start_time = time.time()  # 记录开始时间
-        translated_texts = await translate_text(message.text, config['source_lang'], target_langs)
+        translated_texts = await translate_text(message_content, config['source_lang'], target_langs)
         logger.info(f"翻译耗时: {time.time() - start_time}")
 
         modified_message = translated_texts[target_langs[0]]

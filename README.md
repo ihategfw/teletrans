@@ -71,6 +71,11 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    .tt-skip Hello, this message will not be translated.
    ```
 
+5. Edited message is not translated by default. If you need to translate it, insert `.tt` at the beginning of the message.
+   ```
+   .tt This edited message will be translated.
+   ```
+
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
