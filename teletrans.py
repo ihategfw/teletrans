@@ -220,7 +220,7 @@ async def handle_message(event):
                 return
             message_content = reply_message.text.strip()
             if source_lang and target_langs:
-               logger.info(f"翻译消息: {message.text}")
+                logger.info(f"翻译消息: {message.text}")
                 await translate_and_edit(message, message_content, source_lang, target_langs.split('|'))
             return
 
