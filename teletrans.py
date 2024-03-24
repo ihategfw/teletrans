@@ -237,7 +237,7 @@ async def handle_message(event):
             config = target_config[target_key]
         else:
             # global config
-            target_key = '0.%d' % event.chat_id
+            target_key = '0.%d' % event.sender_id
             if target_key not in target_config:
                 return
             config = target_config[target_key]
