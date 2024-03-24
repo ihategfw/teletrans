@@ -128,7 +128,7 @@ async def translate_openai(text, source_lang, target_lang, session):
             'content': text,
             }
         ],
-        'stream': 'false',
+        'stream': False,
         'model': openai_model,
         'temperature': 0.5,
         'presence_penalty': 0,
