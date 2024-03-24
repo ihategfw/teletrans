@@ -198,7 +198,7 @@ async def handle_message(event):
 
         if isinstance(event, events.MessageEdited.Event):
             if message_content.startswith('.tt'):
-                message_content = message_content[3:]
+                message_content = message_content[3:].strip()
             else:
                 return
 
