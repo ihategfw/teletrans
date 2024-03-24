@@ -69,54 +69,33 @@ openai_model = openai_config['model'] if 'model' in openai_config else 'gpt-3.5-
 
 # 初始化Telegram客户端。
 client = TelegramClient('%s/client' % workspace, api_id, api_hash)
+    
+async def translate_text(text, source_lang, target_langs) -> {}:
+    result = {}
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for target_lang in target_langs:
+            if source_lang == target_lang:
+                result[target_lang] = text
+                continue
+            if target_lang == 'en' and openai_enable:
+                tasks.append(translate_openai(text, source_lang, target_lang, session))
+            else:
+                tasks.append(translate_deeplx(text, source_lang, target_lang, session))
+        # 并发执行翻译任务。
+        for lang, text in await asyncio.gather(*tasks):
+            result[lang] = text
 
+    return result
 
-async def translate_single(text, source_lang, target_lang, session):
-    if source_lang == target_lang:
-        return target_lang, text
-
-    if target_lang == 'en' and openai_enable:
-        url = openai_url
-        headers = {
-            "Authorization": "Bearer %s" % openai_api_key,
-            "Content-Type": "application/json"
-        }
-        payload = {
-            'messages': [
-                {
-                'role': 'system',
-                'content':'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
-                },
-                {
-                'role': 'user',
-                'content': text,
-                }
-            ],
-            'stream': 'false',
-            'model': openai_model,
-            'temperature': 0.5,
-            'presence_penalty': 0,
-            'frequency_penalty': 0,
-            'top_p': 1
-        }
-
-        start_time = time.time()
-        async with session.post(url, headers=headers, data=json.dumps(payload)) as response:
-            logger.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
-            response_text = await response.text()
-            result = json.loads(response_text)
-            try:
-                return target_lang, result['choices'][0]['message']['content']
-            except Exception as e:
-                logger.error(f"OpenAI 翻译失败：{response_text}")
-                
+# 翻译deeplx API函数
+async def translate_deeplx(text, source_lang, target_lang, session):
     url = "https://api.deeplx.org/translate"
     payload = {
         "text": text,
         "source_lang": source_lang,
         "target_lang": target_lang
     }
-
     start_time = time.time()
     async with session.post(url, json=payload) as response:
         logger.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
@@ -129,50 +108,81 @@ async def translate_single(text, source_lang, target_lang, session):
             logger.error(f"翻译失败：{result}")
             raise Exception(f"翻译失败")
 
-        return target_lang, result['data']
+    return target_lang, result['data']
 
+# 翻译openai API函数
+async def translate_openai(text, source_lang, target_lang, session):
+    url = openai_url
+    headers = {
+        "Authorization": "Bearer %s" % openai_api_key,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        'messages': [
+            {
+            'role': 'system',
+            'content':'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
+            },
+            {
+            'role': 'user',
+            'content': text,
+            }
+        ],
+        'stream': 'false',
+        'model': openai_model,
+        'temperature': 0.5,
+        'presence_penalty': 0,
+        'frequency_penalty': 0,
+        'top_p': 1
+    }
 
-async def translate_text(text, source_lang, target_langs) -> {}:
-    result = {}
-    async with aiohttp.ClientSession() as session:
-        tasks = [translate_single(text, source_lang, target_lang, session) for target_lang in target_langs]
-        for lang, text in await asyncio.gather(*tasks):
-            result[lang] = text
+    start_time = time.time()
+    async with session.post(url, headers=headers, data=json.dumps(payload)) as response:
+        logger.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
+        response_text = await response.text()
+        result = json.loads(response_text)
+        try:
+            return target_lang, result['choices'][0]['message']['content']
+        except Exception as e:
+            raise Exception(f"OpenAI 翻译失败：{response_text} {e}")
 
-    return result
+async def command_mode(event, target_key, text):
+    if text.startswith('.tt-on-global') or text == '.tt-off-global':
+        target_key = '0.%d' % event.sender_id
+        text = text.replace('-global', '')
 
-
-async def command_mode(event, target_key, text) -> bool:
     if text == '.tt-off':
         await event.delete()
-
         if target_key in target_config:
             del target_config[target_key]
             save_config()
             logger.info("已禁用: %s" % target_key)
-
-        return False
+        return
 
     if text.startswith('.tt-on,'):
-        await event.delete()
-
         _, source_lang, target_langs = text.split(',')
-        target_config[target_key] = {
-            'source_lang': source_lang,
-            'target_langs': target_langs.split('|')
-        }
-
-        save_config()
-        logger.info(f"设置成功: {target_config[target_key]}")
-
-        return False
+        if not source_lang or not target_langs:
+            await event.message.edit("错误命令，正确格式: .tt-on,source_lang,target_lang1|target_lang2")
+        else:
+            target_config[target_key] = {
+                'source_lang': source_lang,
+                'target_langs': target_langs.split('|')
+            }
+            save_config()
+            logger.info(f"设置成功: {target_config[target_key]}")
+            await event.message.edit("设置成功: %s" % target_config[target_key])
+        await asyncio.sleep(3)
+        await event.message.delete()
+        return
 
     if text.startswith('.tt-skip'):
-        await event.message.edit(text[8:])
+        await event.message.edit(text[8:].strip())
         logger.info("跳过翻译")
-        return False
+        return
 
-    return True
+    await event.message.edit("未知命令")
+    await asyncio.sleep(3)
+    await event.message.delete()
 
 # 同时监听新消息事件和编辑消息事件，进行消息处理。
 @client.on(events.NewMessage(outgoing=True))
@@ -181,10 +191,9 @@ async def handle_message(event):
     target_key = '%d.%d' % (event.chat_id, event.sender_id)
     try:
         message = event.message
-
+        # 忽略空消息。
         if not message.text:
             return
-
         message_content = message.text.strip()
         if not message_content:
             return
@@ -193,61 +202,87 @@ async def handle_message(event):
         if message_content.startswith(','):
             return
 
-        if message_content.startswith('.tt-') and not await command_mode(event, target_key, message_content):
+        # skip bot commands
+        if message_content.startswith('/'):
             return
 
+        # command mode
+        if message_content.startswith('.tt-'):
+            await command_mode(event, target_key, message_content)
+            return
+
+        # handle reply message
+        if message.reply_to_msg_id and message_content.startswith('.tt,'):
+            _, source_lang, target_langs = message_content.split(',')
+            logger.info(f"Reply message: {message.reply_to_msg_id}")
+            reply_message = await client.get_messages(event.chat_id, ids=message.reply_to_msg_id)
+            if not reply_message.text:
+                return
+            message_content = reply_message.text.strip()
+            if source_lang and target_langs:
+               logger.info(f"翻译消息: {message.text}")
+                await translate_and_edit(message, message_content, source_lang, target_langs.split('|'))
+            return
+
+        # handle edited message
         if isinstance(event, events.MessageEdited.Event):
             if message_content.startswith('.tt'):
                 message_content = message_content[3:].strip()
             else:
                 return
 
-        if target_key not in target_config:
-            return
+        # chat config
+        config = {}
+        if target_key in target_config:
+            config = target_config[target_key]
+        else:
+            # global config
+            target_key = '0.%d' % event.chat_id
+            if target_key not in target_config:
+                return
+            config = target_config[target_key]
 
         logger.info(f"翻译消息: {message.text}")
-
-        config = target_config[target_key]
+        source_lang = config['source_lang']
         target_langs = config['target_langs']
-        if not target_langs:
-            return
-
-        start_time = time.time()  # 记录开始时间
-        translated_texts = await translate_text(message_content, config['source_lang'], target_langs)
-        logger.info(f"翻译耗时: {time.time() - start_time}")
-
-        modified_message = translated_texts[target_langs[0]]
-
-        if len(target_langs) > 1:
-            secondary_messages = []
-            for lang in target_langs[1:]:
-                secondary_messages.append(translated_texts[lang])
-
-            modified_message += '\n%s' % '\n'.join(secondary_messages)
-
-        # Handle special characters such as emojis and other unicode characters
-        pattern = u'[\U00010000-\U0010ffff]'
-        matches = len(re.findall(pattern, message_content))
-
-        # Extract repeated computations
-        translated_text = translated_texts[target_langs[0]]
-        pattern_matches_translated = len(re.findall(pattern, translated_text))
-        pattern_matches_modified = len(re.findall(pattern, modified_message))
-
-        # Calculate offsets and lengths
-        offset = len(translated_text) + pattern_matches_translated + 1
-        length = len(modified_message) - len(translated_text) + pattern_matches_modified - pattern_matches_translated - 1
-
-        # Create MessageEntityBlockquote with calculated values
-        formatting_entities = [MessageEntityBlockquote(offset=offset, length=length)]
-
-        # Edit the message
-        await client.edit_message(message, modified_message, formatting_entities=formatting_entities)
+        await translate_and_edit(message, message_content, source_lang, target_langs)
 
     except Exception as e:
         # 记录处理消息时发生的异常。
         logger.error(f"Error handling message: {e}")
 
+async def translate_and_edit(message, message_content, source_lang, target_langs):
+    start_time = time.time()  # 记录开始时间
+    translated_texts = await translate_text(message_content, source_lang, target_langs)
+    logger.info(f"翻译耗时: {time.time() - start_time}")
+
+    modified_message = translated_texts[target_langs[0]]
+
+    if len(target_langs) > 1:
+        secondary_messages = []
+        for lang in target_langs[1:]:
+            secondary_messages.append(translated_texts[lang])
+
+        modified_message += '\n%s' % '\n'.join(secondary_messages)
+
+    # Handle special characters such as emojis and other unicode characters
+    pattern = u'[\U00010000-\U0010ffff]'
+    matches = len(re.findall(pattern, message_content))
+
+    # Extract repeated computations
+    translated_text = translated_texts[target_langs[0]]
+    pattern_matches_translated = len(re.findall(pattern, translated_text))
+    pattern_matches_modified = len(re.findall(pattern, modified_message))
+
+    # Calculate offsets and lengths
+    offset = len(translated_text) + pattern_matches_translated + 1
+    length = len(modified_message) - len(translated_text) + pattern_matches_modified - pattern_matches_translated - 1
+
+    # Create MessageEntityBlockquote with calculated values
+    formatting_entities = [MessageEntityBlockquote(offset=offset, length=length)]
+
+    # Edit the message
+    await client.edit_message(message, modified_message, formatting_entities=formatting_entities)
 
 # 启动客户端并保持运行。
 try:

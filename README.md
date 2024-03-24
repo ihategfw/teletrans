@@ -56,25 +56,37 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    ```
    If no directory is specified, the script will run in the current directory.
 
-2. To enable translation from Chinese to English and Japanese, and keep the original message, use the following command:
+2. To enable translation from Chinese to English and Japanese, and keep the original message, use the following command in the chat:
    ```
    .tt-on,zh,zh|en|ja
    ```
    The code of languages supported by DeepL API can be found [here](https://developers.deepl.com/docs/resources/supported-languages).
 
-3. To disable translation, simply use:
+3. To disable translation in the chat, simply use:
    ```
    .tt-off
    ```
 
-4. If you want to send a message without translating it, use the `.tt-skip` command followed by your message:
+4. To enable or disable global translation, use the following command:
+   ```
+   .tt-on-global,zh,zh|en|ja
+   .tt-off-global
+   ```
+   - The chat config is prioritized over the global config.
+
+5. If you want to send a message without translating it, use the `.tt-skip` command followed by your message:
    ```
    .tt-skip Hello, this message will not be translated.
    ```
 
-5. Edited message is not translated by default. If you need to translate it, insert `.tt` at the beginning of the message.
+6. Edited message is not translated by default. If you need to translate it, insert `.tt` at the beginning of the message.
    ```
    .tt This edited message will be translated.
+   ```
+
+7. If you want to translate the message you replied to, use the below command:
+   ```
+   .tt,zh,zh|en|ja
    ```
 
 ## Daemon
