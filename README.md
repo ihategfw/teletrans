@@ -21,7 +21,7 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/teletrans.git
+   git clone https://github.com/ihategfw/teletrans.git
    ```
 2. Navigate to the project directory:
    ```
