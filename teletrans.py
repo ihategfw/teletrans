@@ -72,14 +72,22 @@ client = TelegramClient('%s/client' % workspace, api_id, api_hash)
     
 async def translate_text(text, source_lang, target_langs) -> {}:
     result = {}
+    # if text is emoji
+    if re.match(r'[\U00010000-\U0010ffff]', text):
+        return result
+    if source_lang == 'zh':
+        # if text's first character is ascii
+        if re.match(r'[a-zA-Z0-9]', text[0]):
+            return result
     async with aiohttp.ClientSession() as session:
         tasks = []
         for target_lang in target_langs:
             if source_lang == target_lang:
                 result[target_lang] = text
                 continue
-            if target_lang == 'en' and openai_enable:
-                tasks.append(translate_openai(text, source_lang, target_lang, session))
+            if target_lang == 'en':
+                if openai_enable:
+                    tasks.append(translate_openai(text, source_lang, target_lang, session))
             else:
                 tasks.append(translate_deeplx(text, source_lang, target_lang, session))
         # 并发执行翻译任务。
@@ -255,6 +263,9 @@ async def translate_and_edit(message, message_content, source_lang, target_langs
     start_time = time.time()  # 记录开始时间
     translated_texts = await translate_text(message_content, source_lang, target_langs)
     logger.info(f"翻译耗时: {time.time() - start_time}")
+
+    if not translated_texts:
+        return
 
     modified_message = translated_texts[target_langs[0]]
 
