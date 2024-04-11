@@ -135,13 +135,8 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    - If `openai.enable` is set to `true`, the bot will use the OpenAI API to translate, and this is only effective when the target language is English.
 
 4. Run the bot with Docker:
-   - Run by `docker run`:
    ```sh
    docker run -itd --name teletrans -v $(pwd):/app/config --restart=unless-stopped ghcr.io/ihategfw/teletrans:latest
-   ```
-   - Run by `docker compose`:
-   ```sh
-   docker compose up -d
    ```
 
 5. For the first time, you need to execute the following command to log in to your Telegram account:
