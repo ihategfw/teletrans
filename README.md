@@ -2,6 +2,10 @@
 
 TeleTrans is a Python-based Telegram bot that translates messages in real-time. It uses the OpenAI API and DeepL API for translation.
 
+
+> [!WARNING]  
+> This project requires the use of Telegram Apps API, which is a high-risk operation that could easily lead to a ban of your account. Please make sure you read and understand the [Telegram API Terms of Service](https://core.telegram.org/api/terms) before using this project.
+
 ## Features
 
 - Real-time translation of messages.
