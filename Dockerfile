@@ -11,4 +11,4 @@ COPY . /app
 RUN pip install -r requirements.txt
 
 # Run the script when the container launches
-CMD ["python", "teletrans.py", "/app/config.json"]
+CMD ["python", "teletrans.py", "/app/config"]
