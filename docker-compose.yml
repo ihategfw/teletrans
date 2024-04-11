@@ -5,4 +5,4 @@ services:
     image: ghcr.io/ihategfw/teletrans:latest
     restart: unless-stopped
     volumes:
-      - ./config:/app/config
+      - .:/app/config
