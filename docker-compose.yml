@@ -1,6 +1,7 @@
 version: '3'
 services:
   teletrans:
+    container_name: teletrans
     image: ghcr.io/ihategfw/teletrans:latest
     restart: unless-stopped
     volumes:
