@@ -85,8 +85,7 @@ async def translate_text(text, source_lang, target_langs) -> {}:
             if source_lang == target_lang:
                 result[target_lang] = text
                 continue
-            if target_lang == 'en':
-                if openai_enable:
+            if target_lang == 'en' and openai_enable:
                     tasks.append(translate_openai(text, source_lang, target_lang, session))
             else:
                 tasks.append(translate_deeplx(text, source_lang, target_lang, session))
