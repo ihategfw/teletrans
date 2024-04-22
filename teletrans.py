@@ -14,6 +14,7 @@ from telethon import events
 from telethon.sync import TelegramClient
 from telethon.tl.types import MessageEntityBlockquote
 from logging.handlers import RotatingFileHandler
+import emoji
 
 
 workspace = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
@@ -72,8 +73,7 @@ client = TelegramClient('%s/client' % workspace, api_id, api_hash)
     
 async def translate_text(text, source_lang, target_langs) -> {}:
     result = {}
-    # if text is emoji
-    if re.match(r'[\U00010000-\U0010ffff]', text):
+    if emoji.purely_emoji(text):
         return result
     if source_lang == 'zh':
         # if text's first character is ascii
@@ -185,6 +185,13 @@ async def command_mode(event, target_key, text):
     if text.startswith('.tt-skip'):
         await event.message.edit(text[8:].strip())
         logger.info("跳过翻译")
+        return
+
+    if text.startswith('.tt-once,'):
+        command, raw_text = text.split(' ')
+        _, source_lang, target_langs = command.split(',')
+        logger.info(f"翻译消息: {raw_text}")
+        await translate_and_edit(event.message, raw_text, source_lang, target_langs.split('|'))
         return
 
     await event.message.edit("未知命令")
