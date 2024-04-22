@@ -184,12 +184,17 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    .tt-skip Hello, this message will not be translated.
    ```
 
-5. Edited message is not translated by default. If you need to translate it, insert `.tt` at the beginning of the message.
+5. If you want to translate only this message once, use the following command, making sure to separate the command and the text with a space; this command ignores the `.tt-on` or `.tt-on-global` parameter:
+   ```
+   .tt-once,en,en|zh Hello, I am teletrans bot
+   ```
+
+6. Edited message is not translated by default. If you need to translate it, insert `.tt` at the beginning of the message.
    ```
    .tt This edited message will be translated.
    ```
 
-6. If you want to translate the message you replied to, use the below command:
+7. If you want to translate the message you replied to, use the below command:
    ```
    .tt,zh,zh|en|ja
    ```

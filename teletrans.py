@@ -188,7 +188,7 @@ async def command_mode(event, target_key, text):
         return
 
     if text.startswith('.tt-once,'):
-        command, raw_text = text.split(' ')
+        command, raw_text = text.split(' ', 1)
         _, source_lang, target_langs = command.split(',')
         logger.info(f"翻译消息: {raw_text}")
         await translate_and_edit(event.message, raw_text, source_lang, target_langs.split('|'))
