@@ -85,7 +85,7 @@ async def translate_text(text, source_lang, target_langs) -> {}:
             if source_lang == target_lang:
                 result[target_lang] = text
                 continue
-            if target_lang == 'en' and openai_enable:
+            if target_lang in ('en', 'ja') and openai_enable:
                     tasks.append(translate_openai(text, source_lang, target_lang, session))
             else:
                 tasks.append(translate_deeplx(text, source_lang, target_lang, session))
@@ -97,7 +97,7 @@ async def translate_text(text, source_lang, target_langs) -> {}:
 
 # 翻译deeplx API函数
 async def translate_deeplx(text, source_lang, target_lang, session):
-    url = "https://api.deeplx.org/translate"
+    url = "https://api.deeplx.org/MgYjqp0Y7JiclFY5nZ4dEnzMVAsXOuCmn_8iJVLIJBc/translate"
     payload = {
         "text": text,
         "source_lang": source_lang,
@@ -105,15 +105,15 @@ async def translate_deeplx(text, source_lang, target_lang, session):
     }
     start_time = time.time()
     async with session.post(url, json=payload) as response:
-        logger.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
+        logger.info(f"DeepL 翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
         if response.status != 200:
             logger.error(f"翻译失败：{response.status}")
             raise Exception(f"翻译失败")
 
         result = await response.json()
         if result['code'] != 200:
-            logger.error(f"翻译失败：{result}")
-            raise Exception(f"翻译失败")
+            logger.error(f"DeepL翻译失败：{result}")
+            raise Exception(f"DeepL翻译失败")
 
     return target_lang, result['data']
 
@@ -124,11 +124,18 @@ async def translate_openai(text, source_lang, target_lang, session):
         "Authorization": "Bearer %s" % openai_api_key,
         "Content-Type": "application/json"
     }
+    # 根据目标语言调整系统消息
+    if target_lang == 'en':
+        system_content = 'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
+    elif target_lang == 'ja':
+        system_content = 'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As a Japanese language expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain Japanese and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
+    else:
+        raise ValueError(f"Unsupported target language: {target_lang}")
     payload = {
         'messages': [
             {
             'role': 'system',
-            'content':'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
+            'content': system_content
             },
             {
             'role': 'user',
@@ -145,7 +152,7 @@ async def translate_openai(text, source_lang, target_lang, session):
 
     start_time = time.time()
     async with session.post(url, headers=headers, data=json.dumps(payload)) as response:
-        logger.info(f"翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
+        logger.info(f"OpenAI 翻译从 {source_lang} 至 {target_lang} 耗时: {time.time() - start_time}")
         response_text = await response.text()
         result = json.loads(response_text)
         try:
