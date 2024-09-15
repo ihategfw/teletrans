@@ -2,6 +2,9 @@
     "api_id": "your_telegram_api_id",
     "api_hash": "your_telegram_api_hash",
     "translation_service": "deeplx",
+    "google": {
+        "creds": {}
+    },
     "azure": {
         "key": "your_azure_key",
         "endpoint": "https://api.cognitive.microsofttranslator.com/",
