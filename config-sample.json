@@ -1,11 +1,23 @@
 {
     "api_id": "your_telegram_api_id",
     "api_hash": "your_telegram_api_hash",
-    "target_config": {},
+    "translation_service": "deeplx",
+    "azure": {
+        "key": "your_azure_key",
+        "endpoint": "https://api.cognitive.microsofttranslator.com/",
+        "region": "global"
+    },
+    "deeplx": {
+        "url": "your_deeplx_url"
+    },
     "openai": {
         "enable": true,
+        "target_lang": "en",
         "api_key": "your_openai_api_key",
         "url": "https://api.openai.com/v1/chat/completions",
-        "model": "gpt-3.5-turbo"
-    }
+        "model": "gpt-3.5-turbo",
+        "prompt": "If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you'll help users express themselves clearly. You're not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.",
+        "temperature": 0.5
+    },
+    "target_config": {}
 }

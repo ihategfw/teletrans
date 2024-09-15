@@ -14,6 +14,9 @@ from telethon import events
 from telethon.sync import TelegramClient
 from telethon.tl.types import MessageEntityBlockquote
 from logging.handlers import RotatingFileHandler
+from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
+from azure.ai.translation.text.models import InputTextItem
+from azure.core.exceptions import HttpResponseError
 import emoji
 
 
@@ -51,25 +54,47 @@ def load_config():
 
     return config
 
-
 def save_config():
     cfg['target_config'] = target_config
     with open('%s/config.json' % workspace, 'w') as f:
         json.dump(cfg, f, indent=2)
 
-
+## configuration
 cfg = load_config()
+## telegram config
 api_id = cfg['api_id']
 api_hash = cfg['api_hash']
-target_config = cfg['target_config'] if 'target_config' in cfg else {}
+## translation service
+translation_service = cfg['translation_service'] 
+## azure config
+azure_config = cfg['azure'] if 'azure' in cfg else {}
+azure_key = azure_config['key'] if 'key' in azure_config else ''
+azure_endpoint = azure_config['endpoint'] if 'endpoint' in azure_config else ''
+azure_region = azure_config['region'] if 'region' in azure_config else ''
+## deeplx config
+deeplx_config = cfg['deeplx'] if 'deeplx' in cfg else {}
+deeplx_url = deeplx_config['url'] if 'url' in deeplx_config else 'https://api.deeplx.org/translate'
+## openai config
 openai_config = cfg['openai'] if 'openai' in cfg else {}
 openai_enable = openai_config['enable'] if 'enable' in openai_config else False
 openai_api_key = openai_config['api_key'] if 'api_key' in openai_config else ''
 openai_url = openai_config['url'] if 'url' in openai_config else 'https://api.openai.com/v1/chat/completions'
 openai_model = openai_config['model'] if 'model' in openai_config else 'gpt-3.5-turbo'
+openai_prompt = openai_config['prompt'] if 'prompt' in openai_config else 'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
+openai_temperature = openai_config['temperature'] if 'temperature' in openai_config else 0.5
+openai_target_lang = openai_config['target_lang'] if 'target_lang' in openai_config else 'en'
+## target config
+target_config = cfg['target_config'] if 'target_config' in cfg else {}
 
 # 初始化Telegram客户端。
 client = TelegramClient('%s/client' % workspace, api_id, api_hash)
+
+# Azure Translation Service Initialization
+if translation_service == 'azure':
+    if not azure_key or not azure_endpoint or not azure_region:
+        logger.error("Azure translation service configuration is missing")
+        exit()
+    text_translator = TextTranslationClient(endpoint=azure_endpoint, credential=TranslatorCredential(azure_key, azure_region))
     
 async def translate_text(text, source_lang, target_langs) -> {}:
     result = {}
@@ -85,10 +110,15 @@ async def translate_text(text, source_lang, target_langs) -> {}:
             if source_lang == target_lang:
                 result[target_lang] = text
                 continue
-            if target_lang == 'en' and openai_enable:
+            if target_lang == openai_target_lang and openai_enable:
                     tasks.append(translate_openai(text, source_lang, target_lang, session))
             else:
-                tasks.append(translate_deeplx(text, source_lang, target_lang, session))
+                if translation_service == 'deeplx':
+                    tasks.append(translate_deeplx(text, source_lang, target_lang, session))
+                elif translation_service == 'azure':
+                    tasks.append(translate_azure(text, source_lang, target_lang, session))
+                else:
+                    raise Exception(f"Unknown translation service: {translation_service}. Available services: deeplx, azure")
         # 并发执行翻译任务。
         for lang, text in await asyncio.gather(*tasks):
             result[lang] = text
@@ -97,7 +127,7 @@ async def translate_text(text, source_lang, target_langs) -> {}:
 
 # 翻译deeplx API函数
 async def translate_deeplx(text, source_lang, target_lang, session):
-    url = "https://api.deeplx.org/translate"
+    url = deeplx_url
     payload = {
         "text": text,
         "source_lang": source_lang,
@@ -117,6 +147,26 @@ async def translate_deeplx(text, source_lang, target_lang, session):
 
     return target_lang, result['data']
 
+async def translate_azure(text, source_lang, target_lang, session):
+    try:
+        source_language = source_lang
+        target_languages = [target_lang]
+        input_text_elements = [ InputTextItem(text = text) ]
+
+        response = text_translator.translate(content = input_text_elements, to = target_languages, from_parameter = source_language)
+        translation = response[0] if response else None
+
+        if translation:
+            for translated_text in translation.translations:
+                logger.info(f"Text was translated to: '{translated_text.to}' and the result is: '{translated_text.text}'.")
+                return translated_text.to, translated_text.text
+
+    except HttpResponseError as exception:
+        if exception.error is not None:
+            logger.error(f"Error Code: {exception.error.code}")
+            logger.error(f"Message: {exception.error.message}")
+        raise
+
 # 翻译openai API函数
 async def translate_openai(text, source_lang, target_lang, session):
     url = openai_url
@@ -128,7 +178,7 @@ async def translate_openai(text, source_lang, target_lang, session):
         'messages': [
             {
             'role': 'system',
-            'content':'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
+            'content': openai_prompt,
             },
             {
             'role': 'user',
@@ -137,7 +187,7 @@ async def translate_openai(text, source_lang, target_lang, session):
         ],
         'stream': False,
         'model': openai_model,
-        'temperature': 0.5,
+        'temperature': openai_temperature,
         'presence_penalty': 0,
         'frequency_penalty': 0,
         'top_p': 1
