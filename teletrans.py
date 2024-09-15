@@ -17,6 +17,8 @@ from logging.handlers import RotatingFileHandler
 from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
 from azure.ai.translation.text.models import InputTextItem
 from azure.core.exceptions import HttpResponseError
+from google.cloud import translate_v2 as translate
+from google.oauth2 import service_account
 import emoji
 
 
@@ -66,6 +68,9 @@ api_id = cfg['api_id']
 api_hash = cfg['api_hash']
 ## translation service
 translation_service = cfg['translation_service'] 
+## google config
+google_config = cfg['google'] if 'google' in cfg else {}
+google_creds = google_config['creds'] if 'creds' in google_config else ''
 ## azure config
 azure_config = cfg['azure'] if 'azure' in cfg else {}
 azure_key = azure_config['key'] if 'key' in azure_config else ''
@@ -89,13 +94,21 @@ target_config = cfg['target_config'] if 'target_config' in cfg else {}
 # 初始化Telegram客户端。
 client = TelegramClient('%s/client' % workspace, api_id, api_hash)
 
+# Google Translation Service Initialization
+if translation_service == 'google':
+    if not google_creds:
+        logger.error("Google translation service configuration is missing")
+        exit()
+    google_credentials = service_account.Credentials.from_service_account_info(google_creds)
+    google_client = translate.Client(credentials=google_credentials)
+
 # Azure Translation Service Initialization
 if translation_service == 'azure':
     if not azure_key or not azure_endpoint or not azure_region:
         logger.error("Azure translation service configuration is missing")
         exit()
     text_translator = TextTranslationClient(endpoint=azure_endpoint, credential=TranslatorCredential(azure_key, azure_region))
-    
+
 async def translate_text(text, source_lang, target_langs) -> {}:
     result = {}
     if emoji.purely_emoji(text):
@@ -113,17 +126,31 @@ async def translate_text(text, source_lang, target_langs) -> {}:
             if target_lang == openai_target_lang and openai_enable:
                     tasks.append(translate_openai(text, source_lang, target_lang, session))
             else:
-                if translation_service == 'deeplx':
-                    tasks.append(translate_deeplx(text, source_lang, target_lang, session))
+                if translation_service == 'google':
+                    tasks.append(translate_google(text, source_lang, target_lang, session))
                 elif translation_service == 'azure':
                     tasks.append(translate_azure(text, source_lang, target_lang, session))
+                elif translation_service == 'deeplx':
+                    tasks.append(translate_deeplx(text, source_lang, target_lang, session))
                 else:
-                    raise Exception(f"Unknown translation service: {translation_service}. Available services: deeplx, azure")
+                    raise Exception(f"Unknown translation service: {translation_service}. Available services: google, azure, deeplx")
         # 并发执行翻译任务。
         for lang, text in await asyncio.gather(*tasks):
             result[lang] = text
 
     return result
+
+# 翻译google API函数
+async def translate_google(text, source_lang, target_lang, session):
+    if isinstance(text, bytes):
+        text = text.decode("utf-8")
+
+    result = google_client.translate(text, target_language=target_lang, format_='text')
+    logger.info("Text: {}".format(result["input"]))
+    logger.info("Translation: {}".format(result["translatedText"]))
+    logger.info("Detected source language: {}".format(result["detectedSourceLanguage"]))
+
+    return target_lang, result["translatedText"]
 
 # 翻译deeplx API函数
 async def translate_deeplx(text, source_lang, target_lang, session):
@@ -147,6 +174,7 @@ async def translate_deeplx(text, source_lang, target_lang, session):
 
     return target_lang, result['data']
 
+# 翻译Azure API函数
 async def translate_azure(text, source_lang, target_lang, session):
     try:
         source_language = source_lang
