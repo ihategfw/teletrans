@@ -66,6 +66,8 @@ cfg = load_config()
 ## telegram config
 api_id = cfg['api_id']
 api_hash = cfg['api_hash']
+## Block quote will be collapsed if the length of the text exceeds this value
+collapsed_length = cfg['collapsed_length'] if 'collapsed_length' in cfg else 0
 ## translation service
 translation_service = cfg['translation_service'] 
 ## google config
@@ -373,8 +375,12 @@ async def translate_and_edit(message, message_content, source_lang, target_langs
     offset = len(translated_text) + pattern_matches_translated + 1
     length = len(modified_message) - len(translated_text) + pattern_matches_modified - pattern_matches_translated - 1
 
-    # Create MessageEntityBlockquote with calculated values
-    formatting_entities = [MessageEntityBlockquote(offset=offset, length=length)]
+    if collapsed_length > 0 and len(modified_message) - offset > collapsed_length:
+        # Create MessageEntityBlockquote with calculated values
+        formatting_entities = [MessageEntityBlockquote(offset=offset, length=length, collapsed=True)]
+    else:
+        formatting_entities = [MessageEntityBlockquote(offset=offset, length=length)]
+
 
     # Edit the message
     await client.edit_message(message, modified_message, formatting_entities=formatting_entities)

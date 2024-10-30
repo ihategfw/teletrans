@@ -1,6 +1,7 @@
 {
     "api_id": "your_telegram_api_id",
     "api_hash": "your_telegram_api_hash",
+    "collapsed_length": 300,
     "translation_service": "deeplx",
     "google": {
         "creds": {}
