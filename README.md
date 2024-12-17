@@ -71,23 +71,21 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
          "url": "your_deeplx_url"
       },
       "openai": {
-         "enable": true,
-         "target_lang": "en",
          "api_key": "your_openai_api_key",
          "url": "https://api.openai.com/v1/chat/completions",
          "model": "gpt-3.5-turbo",
-         "prompt": "Translate the following text to English: ",
+         "prompt": "Translate the following text to tgt_lang: ",
          "temperature": 0.5
       },
       "target_config": {}
    }
     ```
    - `api_id` and `api_hash` are required for the Telegram API. You can get them by creating a new application at [my.telegram.org](https://my.telegram.org).
-   - `translation_service` can be set to `deeplx` or `azure`.
+   - `translation_service` can be set to `openai`, `google`, `azure` or `deeplx`
+   - OpenAI: You should keep the placeholder `tgt_lang` in the prompt.
    - Google: Click [here](https://cloud.google.com/translate/docs/setup) to create a Google Cloud project and get your Google Cloud credentials.
    - Azure: Click [here](https://learn.microsoft.com/en-us/azure/ai-services/translator/create-translator-resource) to create an Azure Translator resource and get your Azure key.
    - DeepLX: Click [here](https://linux.do/t/topic/111737) to get your unique API url.
-   - If `openai.enable` is set to `true`, the bot will use the OpenAI API to translate, you can configure the `target_lang` and `prompt` for OpenAI. Only effective when the target language is same as `openai.target_lang`.
 
 6. Run the script with an optional argument to specify the working directory:
    ```sh
@@ -176,23 +174,21 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
          "url": "your_deeplx_url"
       },
       "openai": {
-         "enable": true,
-         "target_lang": "en",
          "api_key": "your_openai_api_key",
          "url": "https://api.openai.com/v1/chat/completions",
          "model": "gpt-3.5-turbo",
-         "prompt": "Translate the following text to English: ",
+         "prompt": "Translate the following text to tgt_lang: ",
          "temperature": 0.5
       },
       "target_config": {}
    }
     ```
    - `api_id` and `api_hash` are required for the Telegram API. You can get them by creating a new application at [my.telegram.org](https://my.telegram.org).
-   - `translation_service` can be set to `deeplx` or `azure`.
+   - `translation_service` can be set to `openai`, `google`, `azure` or `deeplx`
+   - OpenAI: You should keep the placeholder `tgt_lang` in the prompt.
    - Google: Click [here](https://cloud.google.com/translate/docs/setup) to create a Google Cloud project and get your Google Cloud credentials.
    - Azure: Click [here](https://learn.microsoft.com/en-us/azure/ai-services/translator/create-translator-resource) to create an Azure Translator resource and get your Azure key.
    - DeepLX: Click [here](https://linux.do/t/topic/111737) to get your unique API url.
-   - If `openai.enable` is set to `true`, the bot will use the OpenAI API to translate, you can configure the `target_lang` and `prompt` for OpenAI. Only effective when the target language is same as `openai.target_lang`.
 
 4. Run the bot with Docker:
    ```sh

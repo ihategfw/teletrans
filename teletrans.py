@@ -4,23 +4,22 @@ import asyncio
 import json
 import logging
 import os
-import time
+import re
 import sys
+import time
+from logging.handlers import RotatingFileHandler
 
 import aiohttp
-import requests
-import re
-from telethon import events
-from telethon.sync import TelegramClient
-from telethon.tl.types import MessageEntityBlockquote
-from logging.handlers import RotatingFileHandler
+import emoji
 from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
 from azure.ai.translation.text.models import InputTextItem
 from azure.core.exceptions import HttpResponseError
+from fast_langdetect import detect_language as fast_detect
 from google.cloud import translate_v2 as translate
 from google.oauth2 import service_account
-import emoji
-
+from telethon import events
+from telethon.sync import TelegramClient
+from telethon.tl.types import MessageEntityBlockquote
 
 workspace = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
 
@@ -45,6 +44,7 @@ stream_handler.setFormatter(formatter)
 # 给logger添加handler
 logger.addHandler(stream_handler)
 
+
 def load_config():
     # load config from json file, check if the file exists first
     if not os.path.exists('%s/config.json' % workspace):
@@ -56,10 +56,12 @@ def load_config():
 
     return config
 
+
 def save_config():
     cfg['target_config'] = target_config
     with open('%s/config.json' % workspace, 'w') as f:
         json.dump(cfg, f, indent=2)
+
 
 ## configuration
 cfg = load_config()
@@ -69,7 +71,7 @@ api_hash = cfg['api_hash']
 ## Block quote will be collapsed if the length of the text exceeds this value
 collapsed_length = cfg['collapsed_length'] if 'collapsed_length' in cfg else 0
 ## translation service
-translation_service = cfg['translation_service'] 
+translation_service = cfg['translation_service']
 ## google config
 google_config = cfg['google'] if 'google' in cfg else {}
 google_creds = google_config['creds'] if 'creds' in google_config else ''
@@ -83,13 +85,12 @@ deeplx_config = cfg['deeplx'] if 'deeplx' in cfg else {}
 deeplx_url = deeplx_config['url'] if 'url' in deeplx_config else 'https://api.deeplx.org/translate'
 ## openai config
 openai_config = cfg['openai'] if 'openai' in cfg else {}
-openai_enable = openai_config['enable'] if 'enable' in openai_config else False
 openai_api_key = openai_config['api_key'] if 'api_key' in openai_config else ''
 openai_url = openai_config['url'] if 'url' in openai_config else 'https://api.openai.com/v1/chat/completions'
 openai_model = openai_config['model'] if 'model' in openai_config else 'gpt-3.5-turbo'
-openai_prompt = openai_config['prompt'] if 'prompt' in openai_config else 'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
+openai_prompt = openai_config[
+    'prompt'] if 'prompt' in openai_config else 'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
 openai_temperature = openai_config['temperature'] if 'temperature' in openai_config else 0.5
-openai_target_lang = openai_config['target_lang'] if 'target_lang' in openai_config else 'en'
 ## target config
 target_config = cfg['target_config'] if 'target_config' in cfg else {}
 
@@ -109,38 +110,39 @@ if translation_service == 'azure':
     if not azure_key or not azure_endpoint or not azure_region:
         logger.error("Azure translation service configuration is missing")
         exit()
-    text_translator = TextTranslationClient(endpoint=azure_endpoint, credential=TranslatorCredential(azure_key, azure_region))
+    text_translator = TextTranslationClient(endpoint=azure_endpoint,
+                                            credential=TranslatorCredential(azure_key, azure_region))
+
 
 async def translate_text(text, source_lang, target_langs) -> {}:
     result = {}
     if emoji.purely_emoji(text):
         return result
-    if source_lang == 'zh':
-        # if text's first character is ascii
-        if re.match(r'[a-zA-Z0-9]', text[0]):
-            return result
+    detect_lang = fast_detect(text.replace("\n", "")).lower()
+    if detect_lang in target_langs and detect_lang != source_lang:
+        return result
     async with aiohttp.ClientSession() as session:
         tasks = []
         for target_lang in target_langs:
             if source_lang == target_lang:
                 result[target_lang] = text
                 continue
-            if target_lang == openai_target_lang and openai_enable:
-                    tasks.append(translate_openai(text, source_lang, target_lang, session))
+            if translation_service == 'openai':
+                tasks.append(translate_openai(text, source_lang, target_lang, session))
+            elif translation_service == 'google':
+                tasks.append(translate_google(text, source_lang, target_lang, session))
+            elif translation_service == 'azure':
+                tasks.append(translate_azure(text, source_lang, target_lang, session))
+            elif translation_service == 'deeplx':
+                tasks.append(translate_deeplx(text, source_lang, target_lang, session))
             else:
-                if translation_service == 'google':
-                    tasks.append(translate_google(text, source_lang, target_lang, session))
-                elif translation_service == 'azure':
-                    tasks.append(translate_azure(text, source_lang, target_lang, session))
-                elif translation_service == 'deeplx':
-                    tasks.append(translate_deeplx(text, source_lang, target_lang, session))
-                else:
-                    raise Exception(f"Unknown translation service: {translation_service}. Available services: google, azure, deeplx")
+                raise Exception(
+                    f"Unknown translation service: {translation_service}. Available services: openai, google, azure, deeplx")
         # 并发执行翻译任务。
         for lang, text in await asyncio.gather(*tasks):
             result[lang] = text
-
     return result
+
 
 # 翻译google API函数
 async def translate_google(text, source_lang, target_lang, session):
@@ -153,6 +155,7 @@ async def translate_google(text, source_lang, target_lang, session):
     logger.info("Detected source language: {}".format(result["detectedSourceLanguage"]))
 
     return target_lang, result["translatedText"]
+
 
 # 翻译deeplx API函数
 async def translate_deeplx(text, source_lang, target_lang, session):
@@ -176,19 +179,22 @@ async def translate_deeplx(text, source_lang, target_lang, session):
 
     return target_lang, result['data']
 
+
 # 翻译Azure API函数
 async def translate_azure(text, source_lang, target_lang, session):
     try:
         source_language = source_lang
         target_languages = [target_lang]
-        input_text_elements = [ InputTextItem(text = text) ]
+        input_text_elements = [InputTextItem(text=text)]
 
-        response = text_translator.translate(content = input_text_elements, to = target_languages, from_parameter = source_language)
+        response = text_translator.translate(content=input_text_elements, to=target_languages,
+                                             from_parameter=source_language)
         translation = response[0] if response else None
 
         if translation:
             for translated_text in translation.translations:
-                logger.info(f"Text was translated to: '{translated_text.to}' and the result is: '{translated_text.text}'.")
+                logger.info(
+                    f"Text was translated to: '{translated_text.to}' and the result is: '{translated_text.text}'.")
                 return translated_text.to, translated_text.text
 
     except HttpResponseError as exception:
@@ -197,6 +203,7 @@ async def translate_azure(text, source_lang, target_lang, session):
             logger.error(f"Message: {exception.error.message}")
         raise
 
+
 # 翻译openai API函数
 async def translate_openai(text, source_lang, target_lang, session):
     url = openai_url
@@ -204,15 +211,16 @@ async def translate_openai(text, source_lang, target_lang, session):
         "Authorization": "Bearer %s" % openai_api_key,
         "Content-Type": "application/json"
     }
+    prompt = openai_prompt.replace('tgt_lang', target_lang)
     payload = {
         'messages': [
             {
-            'role': 'system',
-            'content': openai_prompt,
+                'role': 'system',
+                'content': prompt,
             },
             {
-            'role': 'user',
-            'content': text,
+                'role': 'user',
+                'content': 'Source Text: \n' + text,
             }
         ],
         'stream': False,
@@ -232,6 +240,7 @@ async def translate_openai(text, source_lang, target_lang, session):
             return target_lang, result['choices'][0]['message']['content']
         except Exception as e:
             raise Exception(f"OpenAI 翻译失败：{response_text} {e}")
+
 
 async def command_mode(event, target_key, text):
     if text.startswith('.tt-on-global') or text == '.tt-off-global':
@@ -277,6 +286,7 @@ async def command_mode(event, target_key, text):
     await event.message.edit("未知命令")
     await asyncio.sleep(3)
     await event.message.delete()
+
 
 # 同时监听新消息事件和编辑消息事件，进行消息处理。
 @client.on(events.NewMessage(outgoing=True))
@@ -345,6 +355,7 @@ async def handle_message(event):
         # 记录处理消息时发生的异常。
         logger.error(f"Error handling message: {e}")
 
+
 async def translate_and_edit(message, message_content, source_lang, target_langs):
     start_time = time.time()  # 记录开始时间
     translated_texts = await translate_text(message_content, source_lang, target_langs)
@@ -381,9 +392,9 @@ async def translate_and_edit(message, message_content, source_lang, target_langs
     else:
         formatting_entities = [MessageEntityBlockquote(offset=offset, length=length)]
 
-
     # Edit the message
     await client.edit_message(message, modified_message, formatting_entities=formatting_entities)
+
 
 # 启动客户端并保持运行。
 try:
