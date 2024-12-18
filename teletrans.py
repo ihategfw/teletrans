@@ -14,7 +14,7 @@ import emoji
 from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
 from azure.ai.translation.text.models import InputTextItem
 from azure.core.exceptions import HttpResponseError
-from fast_langdetect import detect_language as fast_detect
+from lingua import LanguageDetectorBuilder, Language
 from google.cloud import translate_v2 as translate
 from google.oauth2 import service_account
 from telethon import events
@@ -43,6 +43,10 @@ stream_handler.setFormatter(formatter)
 
 # 给logger添加handler
 logger.addHandler(stream_handler)
+
+detector = LanguageDetectorBuilder.from_all_languages().with_preloaded_language_models().build()
+all_langs = Language.all()
+all_langs = {lang.iso_code_639_1.name.lower(): lang.name for lang in all_langs}
 
 
 def load_config():
@@ -118,7 +122,7 @@ async def translate_text(text, source_lang, target_langs) -> {}:
     result = {}
     if emoji.purely_emoji(text):
         return result
-    detect_lang = fast_detect(text.replace("\n", "")).lower()
+    detect_lang = detector.detect_language_of(text).iso_code_639_1.name.lower()
     if detect_lang in target_langs and detect_lang != source_lang:
         return result
     async with aiohttp.ClientSession() as session:
@@ -211,7 +215,7 @@ async def translate_openai(text, source_lang, target_lang, session):
         "Authorization": "Bearer %s" % openai_api_key,
         "Content-Type": "application/json"
     }
-    prompt = openai_prompt.replace('tgt_lang', target_lang)
+    prompt = openai_prompt.replace('tgt_lang', all_langs.get(target_lang, target_lang))
     payload = {
         'messages': [
             {
@@ -220,7 +224,7 @@ async def translate_openai(text, source_lang, target_lang, session):
             },
             {
                 'role': 'user',
-                'content': 'Source Text: \n' + text,
+                'content': text,
             }
         ],
         'stream': False,

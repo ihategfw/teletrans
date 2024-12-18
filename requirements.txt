@@ -5,4 +5,4 @@ Telethon==1.37.0
 azure-ai-translation-text==1.0.0b1
 google-cloud-translate==3.16.0
 gclient-service-account-auth==0.3.0
-fast-langdetect~=0.2
+lingua-language-detector~=2.0
