@@ -11,12 +11,13 @@ from logging.handlers import RotatingFileHandler
 
 import aiohttp
 import emoji
+import google.generativeai as genai
 from azure.ai.translation.text import TextTranslationClient, TranslatorCredential
 from azure.ai.translation.text.models import InputTextItem
 from azure.core.exceptions import HttpResponseError
-from lingua import LanguageDetectorBuilder, Language
 from google.cloud import translate_v2 as translate
 from google.oauth2 import service_account
+from lingua import LanguageDetectorBuilder, Language
 from telethon import events
 from telethon.sync import TelegramClient
 from telethon.tl.types import MessageEntityBlockquote
@@ -92,9 +93,14 @@ openai_config = cfg['openai'] if 'openai' in cfg else {}
 openai_api_key = openai_config['api_key'] if 'api_key' in openai_config else ''
 openai_url = openai_config['url'] if 'url' in openai_config else 'https://api.openai.com/v1/chat/completions'
 openai_model = openai_config['model'] if 'model' in openai_config else 'gpt-3.5-turbo'
-openai_prompt = openai_config[
-    'prompt'] if 'prompt' in openai_config else 'If my text cannot be translated or contains nonsencial content, just repeat my words precisely. As an American English expert, you\'ll help users express themselves clearly. You\'re not just translating, but rephrasing to maintain clarity. Use plain English and common idioms, and vary sentence lengths for natural flow. Avoid regional expressions. Respond with the translated sentence.'
+openai_prompt = openai_config['prompt'] if 'prompt' in openai_config else ''
 openai_temperature = openai_config['temperature'] if 'temperature' in openai_config else 0.5
+## gemini config
+gemini_config = cfg['gemini'] if 'gemini' in cfg else {}
+gemini_api_key = gemini_config['api_key'] if 'api_key' in gemini_config else ''
+gemini_model = gemini_config['model'] if 'model' in gemini_config else ''
+gemini_prompt = gemini_config['prompt'] if 'prompt' in gemini_config else ''
+gemini_temperature = gemini_config['temperature'] if 'temperature' in gemini_config else 0.5
 ## target config
 target_config = cfg['target_config'] if 'target_config' in cfg else {}
 
@@ -116,6 +122,11 @@ if translation_service == 'azure':
         exit()
     text_translator = TextTranslationClient(endpoint=azure_endpoint,
                                             credential=TranslatorCredential(azure_key, azure_region))
+
+if translation_service == 'gemini':
+    if not gemini_config or not gemini_api_key:
+        logger.error("Gemini translation service configuration is missing")
+    genai.configure(api_key=gemini_api_key)
 
 
 def remove_links(text):
@@ -141,6 +152,8 @@ async def translate_text(text, source_lang, target_langs) -> {}:
                 continue
             if translation_service == 'openai':
                 tasks.append(translate_openai(text_without_link, source_lang, target_lang, session))
+            elif translation_service == 'gemini':
+                tasks.append(translate_gemini(text_without_link, source_lang, target_lang, session))
             elif translation_service == 'google':
                 tasks.append(translate_google(text_without_link, source_lang, target_lang, session))
             elif translation_service == 'azure':
@@ -252,6 +265,14 @@ async def translate_openai(text, source_lang, target_lang, session):
             return target_lang, result['choices'][0]['message']['content']
         except Exception as e:
             raise Exception(f"OpenAI 翻译失败：{response_text} {e}")
+
+
+async def translate_gemini(text, source_lang, target_lang, session):
+    prompt = gemini_prompt.replace('tgt_lang', all_langs.get(target_lang, target_lang))
+    model = genai.GenerativeModel(gemini_model, system_instruction=prompt)
+    response = model.generate_content(text, safety_settings="block_none",
+                                      generation_config=genai.types.GenerationConfig(temperature=gemini_temperature))
+    return target_lang, response.text
 
 
 async def command_mode(event, target_key, text):
