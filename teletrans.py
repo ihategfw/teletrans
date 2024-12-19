@@ -122,12 +122,11 @@ def remove_links(text):
     # regrex pattern for URL
     url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
     # use re.sub to remove the URL from the text
-    return re.sub(url_pattern, '', text)
+    return re.sub(url_pattern, '', text).strip()
 
 
 async def translate_text(text, source_lang, target_langs) -> {}:
     result = {}
-    text = remove_links(text).strip()
     if emoji.purely_emoji(text):
         return result
     detect_lang = detector.detect_language_of(text).iso_code_639_1.name.lower()
@@ -135,18 +134,19 @@ async def translate_text(text, source_lang, target_langs) -> {}:
         return result
     async with aiohttp.ClientSession() as session:
         tasks = []
+        text_without_link = remove_links(text)
         for target_lang in target_langs:
             if source_lang == target_lang:
                 result[target_lang] = text
                 continue
             if translation_service == 'openai':
-                tasks.append(translate_openai(text, source_lang, target_lang, session))
+                tasks.append(translate_openai(text_without_link, source_lang, target_lang, session))
             elif translation_service == 'google':
-                tasks.append(translate_google(text, source_lang, target_lang, session))
+                tasks.append(translate_google(text_without_link, source_lang, target_lang, session))
             elif translation_service == 'azure':
-                tasks.append(translate_azure(text, source_lang, target_lang, session))
+                tasks.append(translate_azure(text_without_link, source_lang, target_lang, session))
             elif translation_service == 'deeplx':
-                tasks.append(translate_deeplx(text, source_lang, target_lang, session))
+                tasks.append(translate_deeplx(text_without_link, source_lang, target_lang, session))
             else:
                 raise Exception(
                     f"Unknown translation service: {translation_service}. Available services: openai, google, azure, deeplx")
