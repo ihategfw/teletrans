@@ -237,6 +237,8 @@ async def translate_openai(text, source_lang, target_lang, session):
         "Content-Type": "application/json"
     }
     prompt = openai_prompt.replace('tgt_lang', all_langs.get(target_lang, target_lang))
+    text = "Source Text: \n" + text
+    print(f"Prompt: {prompt}")
     payload = {
         'messages': [
             {
@@ -272,7 +274,7 @@ async def translate_gemini(text, source_lang, target_lang, session):
     model = genai.GenerativeModel(gemini_model, system_instruction=prompt)
     response = model.generate_content(text, safety_settings="block_none",
                                       generation_config=genai.types.GenerationConfig(temperature=gemini_temperature))
-    return target_lang, response.text
+    return target_lang, response.text.strip()
 
 
 async def command_mode(event, target_key, text):
