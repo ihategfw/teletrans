@@ -10,20 +10,13 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
 
 - Real-time translation of messages.
 - Supports multiple languages.
-- Uses OpenAI and Google/Azure/DeepLX for translation.
+- Uses OpenAI/Gemini and Google/Azure/DeepLX for translation.
 - Configurable source and target languages.
 - Command mode for enabling/disabling translation and setting languages.
 
 ## Requirements
 
-- Python 3.10+
-- aiohttp
-- telethon
-- requests
-- emoji
-- azure-ai-translation-text
-- google-cloud-translate
-- gclient-service-account-auth
+- Python 3.10-3.12
 
 ## Manual Installation
 
@@ -52,7 +45,7 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    ```sh
    pip install -r requirements.txt
    ```
-   
+
 5. Create a `config.json` file in the project directory:
     ```json
     {
@@ -60,7 +53,7 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
       "api_hash": "your_telegram_api_hash",
       "translation_service": "deeplx",
       "google": {
-         "creds": {},
+         "creds": {}
       },
       "azure": {
          "key": "your_azure_key",
@@ -77,15 +70,21 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
          "prompt": "Translate the following text to tgt_lang: ",
          "temperature": 0.5
       },
+      "gemini": {
+         "api_key": "your_openai_api_key",
+         "model": "gpt-3.5-turbo",
+         "prompt": "Translate the following text to tgt_lang: ",
+         "temperature": 0.5
+      },
       "target_config": {}
    }
     ```
-   - `api_id` and `api_hash` are required for the Telegram API. You can get them by creating a new application at [my.telegram.org](https://my.telegram.org).
-   - `translation_service` can be set to `openai`, `google`, `azure` or `deeplx`
-   - OpenAI: You should keep the placeholder `tgt_lang` in the prompt.
-   - Google: Click [here](https://cloud.google.com/translate/docs/setup) to create a Google Cloud project and get your Google Cloud credentials.
-   - Azure: Click [here](https://learn.microsoft.com/en-us/azure/ai-services/translator/create-translator-resource) to create an Azure Translator resource and get your Azure key.
-   - DeepLX: Click [here](https://linux.do/t/topic/111737) to get your unique API url.
+    - `api_id` and `api_hash` are required for the Telegram API. You can get them by creating a new application at [my.telegram.org](https://my.telegram.org).
+    - `translation_service` can be set to `openai`, `google`, `azure` or `deeplx`
+    - OpenAI/Gemini: You should keep the placeholder `tgt_lang` in the prompt.
+    - Google: Click [here](https://cloud.google.com/translate/docs/setup) to create a Google Cloud project and get your Google Cloud credentials.
+    - Azure: Click [here](https://learn.microsoft.com/en-us/azure/ai-services/translator/create-translator-resource) to create an Azure Translator resource and get your Azure key.
+    - DeepLX: Click [here](https://linux.do/t/topic/111737) to get your unique API url.
 
 6. Run the script with an optional argument to specify the working directory:
    ```sh
@@ -155,7 +154,7 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    mkdir teletrans
    cd teletrans
    ```
-   
+
 3. Create a `config.json` file in the project directory:
     ```json
     {
@@ -180,15 +179,21 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
          "prompt": "Translate the following text to tgt_lang: ",
          "temperature": 0.5
       },
+      "gemini": {
+         "api_key": "your_openai_api_key",
+         "model": "gpt-3.5-turbo",
+         "prompt": "Translate the following text to tgt_lang: ",
+         "temperature": 0.5
+      },
       "target_config": {}
    }
     ```
-   - `api_id` and `api_hash` are required for the Telegram API. You can get them by creating a new application at [my.telegram.org](https://my.telegram.org).
-   - `translation_service` can be set to `openai`, `google`, `azure` or `deeplx`
-   - OpenAI: You should keep the placeholder `tgt_lang` in the prompt.
-   - Google: Click [here](https://cloud.google.com/translate/docs/setup) to create a Google Cloud project and get your Google Cloud credentials.
-   - Azure: Click [here](https://learn.microsoft.com/en-us/azure/ai-services/translator/create-translator-resource) to create an Azure Translator resource and get your Azure key.
-   - DeepLX: Click [here](https://linux.do/t/topic/111737) to get your unique API url.
+    - `api_id` and `api_hash` are required for the Telegram API. You can get them by creating a new application at [my.telegram.org](https://my.telegram.org).
+    - `translation_service` can be set to `openai`, `google`, `azure` or `deeplx`
+    - OpenAI/Gemini: You should keep the placeholder `tgt_lang` in the prompt.
+    - Google: Click [here](https://cloud.google.com/translate/docs/setup) to create a Google Cloud project and get your Google Cloud credentials.
+    - Azure: Click [here](https://learn.microsoft.com/en-us/azure/ai-services/translator/create-translator-resource) to create an Azure Translator resource and get your Azure key.
+    - DeepLX: Click [here](https://linux.do/t/topic/111737) to get your unique API url.
 
 4. Run the bot with Docker:
    ```sh
@@ -199,8 +204,8 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    ```sh
    docker exec -it teletrans python teletrans.py /app/config
    ```
-   Follow the instructions to log in. 
-   
+   Follow the instructions to log in.
+
    After logging in, please stop the container by pressing `Ctrl+C` and restart it:
    ```sh
    docker restart teletrans
@@ -229,7 +234,7 @@ TeleTrans is a Python-based Telegram bot that translates messages in real-time. 
    .tt-on-global,zh,zh|en|ja
    .tt-off-global
    ```
-   - The chat config is prioritized over the global config.
+    - The chat config is prioritized over the global config.
 
 4. If you want to send a message without translating it, use the `.tt-skip` command followed by your message:
    ```
