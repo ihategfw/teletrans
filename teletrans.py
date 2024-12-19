@@ -118,8 +118,16 @@ if translation_service == 'azure':
                                             credential=TranslatorCredential(azure_key, azure_region))
 
 
+def remove_links(text):
+    # regrex pattern for URL
+    url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+    # use re.sub to remove the URL from the text
+    return re.sub(url_pattern, '', text)
+
+
 async def translate_text(text, source_lang, target_langs) -> {}:
     result = {}
+    text = remove_links(text).strip()
     if emoji.purely_emoji(text):
         return result
     detect_lang = detector.detect_language_of(text).iso_code_639_1.name.lower()
